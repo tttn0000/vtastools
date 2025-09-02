@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Q4-2025 Construction Cost & Programme Calculator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --accent:#E74099;
+    --fg:#111;
+    --muted:#666;
+    --bg:#fff;
+    --bg2:#f6f7f9;
+    --ok:#cfeadf;
+    --warn:#ffe7c2;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+  h1{font-size:22px;margin:0 0 10px 0}
+  h2{font-size:16px;margin:18px 0 8px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .card{background:var(--bg2);border-radius:10px;padding:14px 12px}
+  .span-12{grid-column:span 12}
+  .span-6{grid-column:span 6}
+  .span-4{grid-column:span 4}
+  .span-3{grid-column:span 3}
+  label{display:block;font-weight:600;margin-bottom:4px}
+  input[type="number"],select{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #d6d9de;background:#fff}
+  input[type="checkbox"]{transform:scale(1.1);margin-right:6px;vertical-align:middle}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .tiny{font-size:12px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eee;font-size:12px;margin-left:6px}
+  .accent{color:var(--accent);font-weight:700}
+  .btn{appearance:none;border:1px solid #cfd3d9;background:#fff;border-radius:8px;padding:8px 10px;cursor:pointer}
+  .btn:hover{border-color:#b5bac2}
+  .table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  .table th,.table td{padding:8px 10px;border-bottom:1px solid #e6e8eb;text-align:right}
+  .table th:nth-child(1),.table td:nth-child(1){text-align:left}
+  .hl{background:var(--ok)}
+  .warn{background:var(--warn)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+  .note{padding:8px 10px;background:#fff;border:1px dashed #e1e4e8;border-radius:8px}
+  .badge{display:inline-block;border:1px solid #e1e4e8;border-radius:999px;padding:2px 8px;background:#fff;font-size:12px}
+  .flex-between{display:flex;justify-content:space-between;align-items:center}
+  .caps{text-transform:uppercase;letter-spacing:.04em;font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Q4-2025 Construction Cost & Programme Calculator <span class="pill">Sydney • Melbourne • Brisbane</span></h1>
+  <div class="tiny muted">
+    Rates include preliminaries and profit; exclude GST and external items. Programme ranges follow Bromilow &amp; Henderson (1977). Interpolation is linear on the published table; the alternative is a power-law fit T = α·(Contract/1e6)<sup>β</sup>.
+  </div>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card span-6">
+      <h2>Inputs</h2>
+      <div class="grid">
+        <div class="span-6">
+          <label for="city">City</label>
+          <select id="city">
+            <option>Sydney</option>
+            <option>Melbourne</option>
+            <option>Brisbane</option>
+          </select>
+        </div>
+        <div class="span-6">
+          <label for="btype">Building type</label>
+          <select id="btype"></select>
+          <div class="tiny muted" id="unitHint"></div>
+        </div>
+
+        <div class="span-6">
+          <label>Input mode</label>
+          <div class="row">
+            <label class="row"><input type="radio" name="mode" value="area" checked>By area (m²)</label>
+            <label class="row"><input type="radio" name="mode" value="unit">By units (where defined)</label>
+          </div>
+        </div>
+
+        <div class="span-3">
+          <label for="gfa">Gross floor area (m²)</label>
+          <input id="gfa" type="number" min="0" step="1" value="1000">
+        </div>
+        <div class="span-3">
+          <label for="units">Units / pupils / rooms</label>
+          <input id="units" type="number" min="0" step="1" value="40" disabled>
+        </div>
+
+        <div class="span-3">
+          <label for="rateM2">Rate $/m² (auto)</label>
+          <input id="rateM2" type="number" min="0" step="10" disabled>
+        </div>
+        <div class="span-3">
+          <label for="unitRate">Unit rate $ (auto)</label>
+          <input id="unitRate" type="number" min="0" step="10" disabled>
+        </div>
+
+        <div class="span-3">
+          <label for="rloc">Location factor (R<sub>loc</sub>)</label>
+          <input id="rloc" type="number" step="0.01" min="0" value="1.00">
+        </div>
+        <div class="span-3">
+          <label for="gstRate">GST rate</label>
+          <input id="gstRate" type="number" step="0.01" min="0" value="0.10">
+        </div>
+
+        <div class="span-12">
+          <label>Allowances (added before GST)</label>
+          <div class="grid">
+            <div class="span-3"><input id="a_ext" type="number" step="100" min="0" value="0"><div class="tiny muted">External works ($)</div></div>
+            <div class="span-3"><input id="a_land" type="number" step="100" min="0" value="0"><div class="tiny muted">Land (if any) ($)</div></div>
+            <div class="span-3"><input id="a_spec" type="number" step="100" min="0" value="0"><div class="tiny muted">Specification uplift ($)</div></div>
+            <div class="span-3"><input id="a_prof" type="number" step="100" min="0" value="0"><div class="tiny muted">Professional fees ($)</div></div>
+          </div>
+        </div>
+
+        <div class="span-6">
+          <label>Contract value used for programme</label>
+          <div class="row">
+            <label class="row"><input type="radio" name="cv" value="ex" checked>Ex-GST</label>
+            <label class="row"><input type="radio" name="cv" value="inc">Incl. GST</label>
+          </div>
+        </div>
+
+        <div class="span-6">
+          <label>Programme band to highlight</label>
+          <select id="progProfile">
+            <option>Normal</option>
+            <option>Short</option>
+            <option>Long</option>
+          </select>
+        </div>
+
+        <div class="span-12 row" style="margin-top:8px">
+          <button class="btn" id="resetBtn" type="button">Reset to defaults</button>
+          <span class="tiny muted">All results update automatically on change.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card span-6">
+      <h2>Cost summary</h2>
+      <table class="table" id="costTable">
+        <thead>
+          <tr><th>Item</th><th class="mono">Value ($)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Base (rate × quantity × R<sub>loc</sub>)</td><td class="mono" id="baseCost">0</td></tr>
+          <tr><td>Allowances subtotal</td><td class="mono" id="allowSum">0</td></tr>
+          <tr class="hl"><td>Contract value ex-GST</td><td class="mono" id="exGST">0</td></tr>
+          <tr><td>GST</td><td class="mono" id="gstAmt">0</td></tr>
+          <tr class="hl"><td>Contract value incl. GST</td><td class="mono" id="incGST">0</td></tr>
+        </tbody>
+      </table>
+
+      <div class="grid" style="margin-top:8px">
+        <div class="span-6 note">
+          <div class="caps">Unit diagnostics</div>
+          <div class="tiny">Rate $/m²: <span class="mono" id="diagRateM2">–</span></div>
+          <div class="tiny">Unit rate: <span class="mono" id="diagUnitRate">–</span></div>
+          <div class="tiny">Effective $/m² (ex-GST): <span class="mono" id="effPerM2">–</span></div>
+          <div class="tiny">Effective per-unit (ex-GST): <span class="mono" id="effPerUnit">–</span></div>
+        </div>
+        <div class="span-6 note">
+          <div class="caps">Contract basis</div>
+          <div class="tiny">Programme uses: <span class="mono" id="cvBasis">Ex-GST</span></div>
+          <div class="tiny">Contract value fed to programme: <span class="mono" id="cvFeed">0</span></div>
+          <div class="tiny">R<sub>loc</sub> × base quantity applied</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card span-12">
+      <h2>Programme duration (weeks)</h2>
+      <div class="row tiny muted" style="margin-bottom:6px">
+        <span class="badge">Table interpolation = exact on published points; linear between points</span>
+        <span class="badge">Power-law = α·(C/1e6)<sup>β</sup>, calibrated to table</span>
+      </div>
+      <table class="table" id="progTable">
+        <thead>
+          <tr>
+            <th>Band</th>
+            <th>Table interpolation</th>
+            <th>Power-law fit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr id="rowShort"><td>Short</td><td class="mono" id="shortInterp">–</td><td class="mono" id="shortPower">–</td></tr>
+          <tr id="rowNormal"><td>Normal</td><td class="mono" id="normalInterp">–</td><td class="mono" id="normalPower">–</td></tr>
+          <tr id="rowLong"><td>Long</td><td class="mono" id="longInterp">–</td><td class="mono" id="longPower">–</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="span-12 tiny muted">
+      Notes:
+      <ul>
+        <li>Rates are taken from “Construction Costs &amp; Program Guide – Q4 2025” for Sydney, Melbourne, and Brisbane; they include preliminaries and profit, and exclude GST and external items.</li>
+        <li>Where a per-unit rate is defined (e.g., motel rooms; pupils), you may switch to unit mode. Otherwise the control is disabled.</li>
+        <li>Programme ranges follow Bromilow &amp; Henderson (1977). Use the highlighted band to reflect procurement intent; the other bands provide sensitivity.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   Data from the Q4-2025 guide
+   ========================= */
+
+// 1) Cost rate tables ($/m²) by city and type
+const RATES_M2 = {
+  "Motel-Std":        {"Sydney": 3500, "Melbourne": 3580, "Brisbane": 3570},
+  "Hotel-Suburban":   {"Sydney": 3840, "Melbourne": 3900, "Brisbane": 4270},
+  "Hotel-CBD-3star":  {"Sydney": 4530, "Melbourne": 4860, "Brisbane": 5700},
+
+  "House-Medium":     {"Sydney": 2050, "Melbourne": 2230, "Brisbane": 2090},
+  "House-High":       {"Sydney": 5120, "Melbourne": 3820, "Brisbane": 6580},
+  "Flats-1-2bed-Med": {"Sydney": 3090, "Melbourne": 3740, "Brisbane": 3150},
+  "Flats-1-2bed-High":{"Sydney": 3670, "Melbourne": 4220, "Brisbane": 3740},
+  "Hostel-≤3storey":  {"Sydney": 3000, "Melbourne": 3520, "Brisbane": 3060},
+
+  "Primary-School":   {"Sydney": 3220, "Melbourne": 3010, "Brisbane": 3280},
+  "Secondary-School": {"Sydney": 3360, "Melbourne": 3030, "Brisbane": 3290},
+
+  "Medical-Centre":   {"Sydney": 3500, "Melbourne": 4460, "Brisbane": 4600},
+  "Child-Care":       {"Sydney": 2990, "Melbourne": 2990, "Brisbane": 3070},
+
+  "Office-Suburban":  {"Sydney": 2920, "Melbourne": 3420, "Brisbane": 2980},
+  "Office-CBD-MedHigh":{"Sydney": 4170, "Melbourne": 4030, "Brisbane": 4250}
+};
+
+// Optional per-unit rates where clearly specified in the guide
+const UNIT_RATES = {
+  "Motel-Std": {"Sydney": 116800, "Melbourne": 115500, "Brisbane": 117900},
+  "Primary-School": {"All": 16560},
+  "Secondary-School": {"All": 23600}
+};
+
+// 2) Programme tables (weeks) vs Contract Value ($)
+const PROG_POINTS = {
+  "Short": [
+    [10000,5],[20000,6],[50000,7],[100000,9],[200000,11],
+    [300000,13],[400000,14],[500000,15],[600000,16],
+    [700000,16],[800000,17],[900000,18],[1000000,18],
+    [2000000,23],[3000000,25],[4000000,28],[5000000,30],
+    [6000000,31],[7000000,33],[8000000,34],[9000000,35],
+    [10000000,36],[20000000,45],[25000000,48],[30000000,51]
+  ],
+  "Normal": [
+    [10000,6],[20000,7],[50000,9],[100000,11],[200000,14],
+    [300000,16],[400000,17],[500000,19],[600000,20],
+    [700000,21],[800000,21],[900000,22],[1000000,22],
+    [2000000,28],[3000000,32],[4000000,35],[5000000,37],
+    [6000000,39],[7000000,41],[8000000,43],[9000000,44],
+    [10000000,46],[20000000,56],[25000000,60],[30000000,64]
+  ],
+  "Long": [
+    [10000,7],[20000,9],[50000,12],[100000,15],[200000,18],
+    [300000,21],[400000,23],[500000,24],[600000,26],
+    [700000,27],[800000,28],[900000,29],[1000000,30],
+    [2000000,37],[3000000,41],[4000000,45],[5000000,48],
+    [6000000,51],[7000000,53],[8000000,56],[9000000,58],
+    [10000000,59],[20000000,73],[25000000,78],[30000000,83]
+  ]
+};
+
+// Power-law fit coefficients T = α·(C/1e6)^β
+const POWER_COEFFS = {
+  "Short":[18.35,0.2963],
+  "Normal":[22.82,0.3008],
+  "Long":[29.69,0.3036]
+};
+
+/* =========================
+   Utilities
+   ========================= */
+const $ = (q)=>document.querySelector(q);
+const $$ = (q)=>document.querySelectorAll(q);
+
+function clampInterp(points, x){
+  if (x<=points[0][0]) return points[0][1];
+  if (x>=points[points.length-1][0]) return points[points.length-1][1];
+  for (let i=0;i<points.length-1;i++){
+    const [x0,y0]=points[i], [x1,y1]=points[i+1];
+    if (x>=x0 && x<=x1){
+      const t=(x-x0)/(x1-x0);
+      return y0 + t*(y1-y0);
+    }
+  }
+  return points[points.length-1][1];
+}
+
+function powerWeeks(cv, profile){
+  const [a,b]=POWER_COEFFS[profile];
+  const cM = Math.max(cv/1_000_000, 1e-6);
+  return a*Math.pow(cM,b);
+}
+
+function money(n){
+  if (!isFinite(n)) return '–';
+  return Math.round(n).toLocaleString('en-AU');
+}
+
+function num(n, dp=2){
+  if (!isFinite(n)) return '–';
+  return Number(n).toFixed(dp);
+}
+
+/* =========================
+   DOM + Logic
+   ========================= */
+const cityEl = $('#city');
+const btypeEl = $('#btype');
+const modeEls = $$('input[name="mode"]');
+const gfaEl = $('#gfa');
+const unitsEl = $('#units');
+const rateM2El = $('#rateM2');
+const unitRateEl = $('#unitRate');
+const rlocEl = $('#rloc');
+const gstRateEl = $('#gstRate');
+
+const aExtEl = $('#a_ext');
+const aLandEl= $('#a_land');
+const aSpecEl= $('#a_spec');
+const aProfEl= $('#a_prof');
+
+const cvEls = $$('input[name="cv"]');
+const progProfileEl = $('#progProfile');
+
+const unitHint = $('#unitHint');
+
+function populateTypes(){
+  const types = Object.keys(RATES_M2);
+  types.forEach(t=>{
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    btypeEl.appendChild(opt);
+  });
+}
+populateTypes();
+
+function currentMode(){
+  return [...modeEls].find(r=>r.checked).value;
+}
+function currentCVBasis(){
+  return [...cvEls].find(r=>r.checked).value; // 'ex' or 'inc'
+}
+
+function refreshAutoRates(){
+  const t = btypeEl.value;
+  const c = cityEl.value;
+  const m2 = (RATES_M2[t] && RATES_M2[t][c]) || NaN;
+  rateM2El.value = isFinite(m2)? m2 : '';
+  $('#diagRateM2').textContent = isFinite(m2)? money(m2) : '–';
+
+  let u = NaN;
+  if (UNIT_RATES[t]){
+    if ('All' in UNIT_RATES[t]) u = UNIT_RATES[t]['All'];
+    else if (c in UNIT_RATES[t]) u = UNIT_RATES[t][c];
+  }
+  const hasUnit = isFinite(u);
+  unitRateEl.value = hasUnit? u : '';
+  $('#diagUnitRate').textContent = hasUnit? money(u) : '–';
+
+  // Enable/disable unit mode accordingly
+  const unitRadio = [...modeEls].find(r=>r.value==='unit');
+  if (hasUnit){
+    unitRadio.disabled = false;
+    unitsEl.disabled = (currentMode()!=='unit')? true:false;
+    unitHint.textContent = 'Unit pricing available for this type.';
+  } else {
+    unitRadio.checked = true && unitRadio.checked && false; // ensure not locked in
+    unitRadio.disabled = true;
+    // Force area mode if unit mode was selected
+    if (currentMode()==='unit'){
+      [...modeEls].find(r=>r.value==='area').checked = true;
+    }
+    unitsEl.disabled = true;
+    unitHint.textContent = 'No unit pricing defined for this type.';
+  }
+
+  // Toggle quantity inputs
+  const mode = currentMode();
+  gfaEl.disabled = (mode!=='area')? true:false;
+  unitsEl.disabled = (mode!=='unit')? true:false;
+}
+
+function compute(){
+  refreshAutoRates();
+
+  const mode = currentMode();
+  const city = cityEl.value;
+  const t = btypeEl.value;
+  const rloc = parseFloat(rlocEl.value)||0;
+  const gst = parseFloat(gstRateEl.value)||0;
+
+  const gfa = Math.max(0, parseFloat(gfaEl.value)||0);
+  const units = Math.max(0, parseFloat(unitsEl.value)||0);
+
+  const rateM2 = parseFloat(rateM2El.value)||NaN;
+  const unitRate = parseFloat(unitRateEl.value)||NaN;
+
+  const aExt = Math.max(0, parseFloat(aExtEl.value)||0);
+  const aLand= Math.max(0, parseFloat(aLandEl.value)||0);
+  const aSpec= Math.max(0, parseFloat(aSpecEl.value)||0);
+  const aProf= Math.max(0, parseFloat(aProfEl.value)||0);
+
+  let base=0, exGST=0, incGST=0, qty=0;
+  if (mode==='area'){
+    qty = gfa;
+    base = qty * rateM2 * rloc;
+  } else {
+    qty = units;
+    base = qty * unitRate * rloc;
+  }
+  const allowances = aExt + aLand + aSpec + aProf;
+  exGST = base + allowances;
+  const gstAmt = exGST * gst;
+  incGST = exGST + gstAmt;
+
+  // Feed to DOM
+  $('#baseCost').textContent = money(base);
+  $('#allowSum').textContent = money(allowances);
+  $('#exGST').textContent = money(exGST);
+  $('#gstAmt').textContent = money(gstAmt);
+  $('#incGST').textContent = money(incGST);
+
+  // Diagnostics
+  $('#effPerM2').textContent = (mode==='area' && gfa>0)? money(exGST/gfa) : '–';
+  $('#effPerUnit').textContent = (mode==='unit' && units>0)? money(exGST/units) : '–';
+  $('#cvBasis').textContent = currentCVBasis()==='ex' ? 'Ex-GST' : 'Incl. GST';
+
+  const cv = currentCVBasis()==='ex' ? exGST : incGST;
+  $('#cvFeed').textContent = money(cv);
+
+  // Programme: both interpolation and power-law for all bands
+  const bands = ['Short','Normal','Long'];
+  bands.forEach(b=>{
+    const interp = clampInterp(PROG_POINTS[b], cv);
+    const power  = powerWeeks(cv, b);
+    const id = b.toLowerCase();
+    $('#'+id+'Interp').textContent = num(interp,2);
+    $('#'+id+'Power').textContent = num(power,2);
+  });
+
+  // Highlight selected band
+  ['rowShort','rowNormal','rowLong'].forEach(id=>{
+    $('#'+id).classList.remove('hl');
+  });
+  const highlight = progProfileEl.value; // 'Short'|'Normal'|'Long'
+  $('#row'+highlight).classList.add('hl');
+
+  // Warn if outside table span
+  const maxSpan = PROG_POINTS['Long'][PROG_POINTS['Long'].length-1][0];
+  const minSpan = PROG_POINTS['Short'][0][0];
+  const tableEl = $('#progTable');
+  tableEl.classList.remove('warn');
+  if (cv < minSpan || cv > maxSpan){
+    tableEl.classList.add('warn');
+  }
+}
+
+function resetAll(){
+  cityEl.value = 'Sydney';
+  btypeEl.selectedIndex = 0;
+  gfaEl.value = 1000;
+  unitsEl.value = 40;
+  rlocEl.value = 1.00;
+  gstRateEl.value = 0.10;
+
+  aExtEl.value = 0;
+  aLandEl.value= 0;
+  aSpecEl.value= 0;
+  aProfEl.value= 0;
+
+  // Default modes
+  [...modeEls].forEach(r=>r.checked = r.value==='area');
+  [...cvEls].forEach(r=>r.checked = r.value==='ex');
+  progProfileEl.value = 'Normal';
+
+  refreshAutoRates();
+  compute();
+}
+
+/* =========================
+   Wire up events
+   ========================= */
+[
+  cityEl, btypeEl, gfaEl, unitsEl, rateM2El, unitRateEl, rlocEl, gstRateEl,
+  aExtEl, aLandEl, aSpecEl, aProfEl, progProfileEl
+].forEach(el=> el.addEventListener('input', compute));
+
+modeEls.forEach(r=> r.addEventListener('change', ()=>{
+  // Toggle quantity controls
+  const mode = currentMode();
+  gfaEl.disabled = (mode!=='area');
+  unitsEl.disabled = (mode!=='unit');
+  compute();
+}));
+
+cvEls.forEach(r=> r.addEventListener('change', compute));
+$('#resetBtn').addEventListener('click', resetAll);
+
+/* =========================
+   Init
+   ========================= */
+refreshAutoRates();
+compute();
+</script>
+</body>
+</html>
