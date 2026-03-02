@@ -244,6 +244,7 @@
         <table id="suburbTable" class="display compact">
             <thead>
                 <tr>
+                    <th>#</th>
                     <th>Suburb</th>
                     <th>State</th>
                     <th>Population</th>
@@ -309,6 +310,14 @@
             const table = $('#suburbTable').DataTable({
                 data: localityData,
                 columns: [
+                    { 
+                        data: null, 
+                        render: function (data, type, row, meta) {
+                            return ""; // Will be populated by drawCallback
+                        },
+                        orderable: false,
+                        width: '30px'
+                    },
                     { data: 'LOCALITY' },
                     { data: 'STATE' },
                     { data: 'POPULATION', render: $.fn.dataTable.render.number(',', '.', 0) },
@@ -330,8 +339,15 @@
                     }
                 ],
                 pageLength: 25,
-                order: [[2, 'desc']],
-                dom: 'lfrtip'
+                order: [[3, 'desc']], // Adjusted for new column (Population is now index 3)
+                dom: 'lfrtip',
+                drawCallback: function(settings) {
+                    var api = this.api();
+                    var startIndex = api.context[0]._iDisplayStart;
+                    api.column(0, {search:'applied', order:'applied'}).nodes().each(function(cell, i) {
+                        cell.innerHTML = startIndex + i + 1;
+                    });
+                }
             });
 
             // Filtering Logic
