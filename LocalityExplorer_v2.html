@@ -320,13 +320,40 @@
                     },
                     { data: 'LOCALITY' },
                     { data: 'STATE' },
-                    { data: 'POPULATION', render: $.fn.dataTable.render.number(',', '.', 0) },
-                    { data: 'AREA', render: $.fn.dataTable.render.number(',', '.', 0) },
-                    { data: 'DENSITY', render: $.fn.dataTable.render.number(',', '.', 0) },
+                    { 
+                        data: 'POPULATION', 
+                        render: function(data, type, row) {
+                            if (type === 'display') {
+                                return data.toLocaleString();
+                            }
+                            return data;
+                        }
+                    },
+                    { 
+                        data: 'AREA', 
+                        render: function(data, type, row) {
+                            if (type === 'display') {
+                                return data.toLocaleString();
+                            }
+                            return data;
+                        }
+                    },
+                    { 
+                        data: 'DENSITY', 
+                        render: function(data, type, row) {
+                            if (type === 'display') {
+                                return data.toLocaleString();
+                            }
+                            return data;
+                        }
+                    },
                     { 
                         data: 'DISTANCE', 
-                        render: function(data) { 
-                            return data === 'N/A' ? 'N/A' : Math.round(data).toLocaleString() + ' km'; 
+                        render: function(data, type, row) {
+                            if (type === 'display') {
+                                return data === 'N/A' ? 'N/A' : data.toLocaleString() + ' km';
+                            }
+                            return data === 'N/A' ? -1 : data;
                         } 
                     },
                     { data: 'DIRECTION' },
@@ -339,7 +366,7 @@
                     }
                 ],
                 pageLength: 25,
-                order: [[3, 'desc']], // Adjusted for new column (Population is now index 3)
+                order: [[3, 'desc']], // Default sort by Population
                 dom: 'lfrtip',
                 drawCallback: function(settings) {
                     var api = this.api();
